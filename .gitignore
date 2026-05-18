@@ -1,0 +1,29 @@
+# Quartus generated files
+db/
+incremental_db/
+output_files/
+simulation/
+*.qws
+*.rpt
+*.summary
+*.smsg
+*.flow.rpt
+*.done
+*.sof
+*.pof
+*.rbf
+*.jic
+*.pin
+*.sld
+
+# Simulation / compile artifacts
+*.vvp
+*.vcd
+*.lxt
+
+# macOS
+.DS_Store
+
+# HTML scratch files
+scratch_*.html
+ep4ce6e22_pinout*.html
