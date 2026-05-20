@@ -16,7 +16,7 @@ All DSP written in Verilog from scratch — no IP cores, no libraries.
 | CS4344                             | DAC — stereo audio output (I²S) |
 | PCM1808 (HW-935)                   | ADC — stereo audio input (I²S) |
 | ADS1115                            | 16-bit ADC — reads potentiometers (I²C) |
-| Arduino UNO *(optional)*           | I²C bridge: ADS1115 → UART → FPGA |
+| Arduino UNO *(optional)*           | Alternative to ADS1115: reads pots directly → UART → FPGA |
 | 4× potentiometer 10kΩ              | Volume, wet/dry, bitcrusher depth, reverb decay |
 
 ## Signal chain
