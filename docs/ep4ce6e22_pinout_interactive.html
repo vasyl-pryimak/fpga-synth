@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Розпіновка Altera Cyclone IV Board (True Layout)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f0f0f; color: #e5e7eb; font-family: 'Inter', sans-serif; }
+        .board-container {
+            background: #1a1a1a;
+            border-radius: 20px;
+            padding: 40px;
+            margin: 20px auto;
+            max-width: 1000px;
+            border: 1px solid #333;
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.8);
+        }
+        .header-strip {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            background: #050505;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid #222;
+        }
+        .pin {
+            padding: 4px 2px;
+            font-size: 10px;
+            text-align: center;
+            border-radius: 4px;
+            font-weight: 700;
+            min-width: 36px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .pin-io { background: #2563eb; color: #fff; }
+        .pin-pwr { background: #dc2626; color: #fff; }
+        .pin-gnd { background: #4b5563; color: #fff; }
+        .pin-nc { background: #27272a; color: #71717a; }
+
+        /* Стилі для пошуку */
+        .pin.highlight {
+            background: #facc15 !important;
+            color: #000 !important;
+            transform: scale(1.2);
+            z-index: 10;
+            box-shadow: 0 0 15px #facc15;
+        }
+        .pin.dimmed {
+            opacity: 0.3;
+            filter: grayscale(0.5);
+        }
+
+        .fpga-chip {
+            width: 240px;
+            height: 240px;
+            background: radial-gradient(circle at center, #2a2a2a 0%, #111 100%);
+            border: 2px solid #333;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            position: relative;
+        }
+        .pin-col-label { font-size: 9px; color: #9ca3af; text-align: center; margin-bottom: 6px; font-weight: bold; }
+        .bottom-grid { display: grid; grid-template-columns: repeat(11, 1fr); gap: 4px; margin-top: 20px; }
+
+        input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 10px rgba(37, 99, 235, 0.5); }
+    </style>
+</head>
+<body class="p-4 md:p-12">
+
+<div class="max-w-4xl mx-auto text-center mb-6">
+    <h1 class="text-4xl font-black text-white tracking-tighter uppercase">FPGA PINOUT <span class="text-blue-500 font-mono">VERIFIED</span></h1>
+    <p class="text-gray-400 mt-2 font-medium">Швидкий пошук та повна конфігурація</p>
+</div>
+
+<!-- Пошук -->
+<div class="max-w-md mx-auto mb-10">
+    <div class="relative">
+        <input type="text" id="pinSearch" placeholder="Введіть номер піна (напр. 144)..."
+               class="w-full bg-[#111] border border-[#333] rounded-full px-6 py-3 text-white text-center font-bold tracking-wide transition-all">
+    </div>
+</div>
+
+<div class="board-container">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+
+        <!-- LEFT HEADER (J2/J3) -->
+        <div>
+            <h3 class="text-center text-blue-400 font-bold mb-4 flex items-center justify-center gap-2">
+                <span class="w-2 h-2 bg-blue-500 rounded-full"></span> L-HEADER
+            </h3>
+            <div class="header-strip">
+                <!-- INNER COLUMN -->
+                <div class="flex flex-col gap-1">
+                    <div class="pin-col-label">Inner</div>
+                    <div class="pin pin-pwr">VB</div><div class="pin pin-pwr">VB</div><div class="pin pin-pwr">VB</div><div class="pin pin-pwr">VB</div>
+                    <div class="pin pin-io">39</div><div class="pin pin-io">43</div><div class="pin pin-io">46</div><div class="pin pin-io">50</div>
+                    <div class="pin pin-io">52</div><div class="pin pin-io">54</div><div class="pin pin-io">58</div><div class="pin pin-io">60</div>
+                    <div class="pin pin-io">65</div><div class="pin pin-io">67</div><div class="pin pin-io">69</div><div class="pin pin-io">71</div>
+                    <div class="pin pin-nc">NC</div>
+                    <div class="pin pin-pwr">1.8V</div>
+                    <div class="pin pin-pwr">1.2V</div>
+                    <div class="pin pin-gnd">GND</div>
+                </div>
+                <!-- OUTER COLUMN -->
+                <div class="flex flex-col gap-1">
+                    <div class="pin-col-label">Outer</div>
+                    <div class="pin pin-pwr">1.2</div><div class="pin pin-pwr">1.8</div><div class="pin pin-pwr">2.5</div><div class="pin pin-pwr">3.3</div>
+                    <div class="pin pin-io">38</div><div class="pin pin-io">42</div><div class="pin pin-io">44</div><div class="pin pin-io">49</div>
+                    <div class="pin pin-io">51</div><div class="pin pin-io">53</div><div class="pin pin-io">55</div><div class="pin pin-io">59</div>
+                    <div class="pin pin-io">64</div><div class="pin pin-io">66</div><div class="pin pin-io">68</div><div class="pin pin-io">70</div>
+                    <div class="pin pin-io">72</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FPGA CENTER SECTION -->
+        <div class="flex flex-col items-center justify-center">
+            <div class="fpga-chip">
+                <div class="z-10">
+                    <div class="text-blue-500 font-black text-2xl tracking-tighter text-center">ALTERA</div>
+                    <div class="text-gray-500 text-[10px] font-bold tracking-widest uppercase text-center">Cyclone IV</div>
+                    <div class="text-white font-mono mt-1 text-sm border-t border-white/10 pt-1 text-center">EP4CE6E22C8N</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-6 w-full">
+                <div class="bg-yellow-950/20 p-3 rounded-lg border border-yellow-600/20 text-center">
+                    <span class="block text-[8px] text-yellow-500 font-bold uppercase mb-1">Sys CLK</span>
+                    <span class="block text-xs text-white font-bold">50MHz</span>
+                    <span class="block text-[9px] text-gray-500">P24/25</span>
+                </div>
+                <div class="bg-yellow-950/20 p-3 rounded-lg border border-yellow-600/20 text-center">
+                    <span class="block text-[8px] text-yellow-500 font-bold uppercase mb-1">Aux CLK</span>
+                    <span class="block text-xs text-white font-bold">27MHz</span>
+                    <span class="block text-[9px] text-gray-400">P90/91</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT HEADER (J4/J5) -->
+        <div>
+            <h3 class="text-center text-blue-400 font-bold mb-4 flex items-center justify-center gap-2">
+                <span class="w-2 h-2 bg-blue-500 rounded-full"></span> R-HEADER
+            </h3>
+            <div class="header-strip">
+                <!-- INNER COLUMN -->
+                <div class="flex flex-col gap-1">
+                    <div class="pin-col-label">Inner</div>
+                    <div class="pin pin-pwr">3.3</div>
+                    <div class="pin pin-pwr">2.5</div>
+                    <div class="pin pin-pwr">1.8</div>
+                    <div class="pin pin-pwr">1.2</div>
+                    <div class="pin pin-io">143</div>
+                    <div class="pin pin-io">141</div>
+                    <div class="pin pin-io">137</div>
+                    <div class="pin pin-io">135</div>
+                    <div class="pin pin-io">132</div>
+                    <div class="pin pin-io">128</div>
+                    <div class="pin pin-io">126</div>
+                    <div class="pin pin-io">124</div>
+                    <div class="pin pin-io">120</div>
+                    <div class="pin pin-io">115</div>
+                    <div class="pin pin-io">112</div>
+                    <div class="pin pin-io">110</div>
+                    <div class="pin pin-pwr">5V</div>
+                    <div class="pin pin-pwr">3.3V</div>
+                    <div class="pin pin-pwr">2.5V</div>
+                    <div class="pin pin-gnd">GND</div>
+                </div>
+                <!-- OUTER COLUMN -->
+                <div class="flex flex-col gap-1">
+                    <div class="pin-col-label">Outer</div>
+                    <div class="pin pin-pwr">VC</div>
+                    <div class="pin pin-pwr">VC</div>
+                    <div class="pin pin-pwr">VC</div>
+                    <div class="pin pin-pwr">VC</div>
+                    <div class="pin pin-io">144</div>
+                    <div class="pin pin-io">142</div>
+                    <div class="pin pin-io">138</div>
+                    <div class="pin pin-io">136</div>
+                    <div class="pin pin-io">133</div>
+                    <div class="pin pin-io">129</div>
+                    <div class="pin pin-io">127</div>
+                    <div class="pin pin-io">125</div>
+                    <div class="pin pin-io">121</div>
+                    <div class="pin pin-io">119</div>
+                    <div class="pin pin-io">113</div>
+                    <div class="pin pin-io">111</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM GPIO -->
+    <div class="text-center mt-10 mb-2 font-black text-[10px] text-blue-400 uppercase tracking-widest">Bottom Bank</div>
+    <div class="bottom-grid">
+        <div class="pin pin-gnd">GND</div>
+        <div class="pin pin-io">34/NC</div>
+        <div class="pin pin-io">32/33</div>
+        <div class="pin pin-io">30/31</div>
+        <div class="pin pin-io">76/28</div>
+        <div class="pin pin-io">77/83</div>
+        <div class="pin pin-io">85/86</div>
+        <div class="pin pin-io">98/99</div>
+        <div class="pin pin-io">100/101</div>
+        <div class="pin pin-io">103/104</div>
+        <div class="pin pin-io">105/106</div>
+    </div>
+
+    <!-- BUTTONS -->
+    <div class="mt-8 pt-8 border-t border-white/5 flex justify-around">
+        <div class="text-center"><div class="w-12 h-6 bg-gray-800 rounded-sm mb-1 mx-auto border border-white/5"></div><span class="text-[9px] font-bold">P73</span></div>
+        <div class="text-center"><div class="w-12 h-6 bg-gray-800 rounded-sm mb-1 mx-auto border border-white/5"></div><span class="text-[9px] font-bold">P80</span></div>
+        <div class="text-center"><div class="w-12 h-6 bg-red-950 rounded-sm mb-1 mx-auto border border-red-500/40"></div><span class="text-[9px] font-bold text-red-500">RESET</span></div>
+        <div class="text-center"><div class="w-12 h-6 bg-gray-800 rounded-sm mb-1 mx-auto border border-white/5"></div><span class="text-[9px] font-bold">P89</span></div>
+        <div class="text-center"><div class="w-12 h-6 bg-gray-800 rounded-sm mb-1 mx-auto border border-white/5"></div><span class="text-[9px] font-bold">P114</span></div>
+    </div>
+</div>
+
+<script>
+    const searchInput = document.getElementById('pinSearch');
+    const pins = document.querySelectorAll('.pin');
+
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+
+        if (query === '') {
+            pins.forEach(pin => {
+                pin.classList.remove('highlight', 'dimmed');
+            });
+            return;
+        }
+
+        pins.forEach(pin => {
+            const pinText = pin.textContent.toLowerCase();
+            // Перевіряємо, чи текст піна містить введене число або ідентичний йому
+            // (напр. якщо введено 34, підсвітимо "34/NC" або просто "34")
+            const isMatch = pinText.split('/').some(part => part === query) || pinText === query;
+
+            if (isMatch) {
+                pin.classList.add('highlight');
+                pin.classList.remove('dimmed');
+            } else {
+                pin.classList.add('dimmed');
+                pin.classList.remove('highlight');
+            }
+        });
+    });
+</script>
+
+</body>
+</html>
