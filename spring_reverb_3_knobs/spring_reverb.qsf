@@ -1,0 +1,21 @@
+set_global_assignment -name FAMILY "Cyclone IV E"
+set_global_assignment -name DEVICE EP4CE6E22C8
+set_global_assignment -name TOP_LEVEL_ENTITY spring_reverb
+set_global_assignment -name VERILOG_FILE spring_reverb.v
+set_global_assignment -name VERILOG_FILE reverb_core.v
+set_global_assignment -name VERILOG_FILE delay_line.v
+set_global_assignment -name VERILOG_FILE i2c_master.v
+
+# Тактування
+set_location_assignment PIN_24   -to clk
+
+# I²S — без змін відносно Phase 3
+set_location_assignment PIN_110  -to mclk
+set_location_assignment PIN_111  -to lrclk
+set_location_assignment PIN_112  -to sclk
+set_location_assignment PIN_113  -to sdin
+set_location_assignment PIN_115  -to dout
+
+# I²C — без змін відносно Phase 3
+set_location_assignment PIN_119  -to sda
+set_location_assignment PIN_120  -to scl
