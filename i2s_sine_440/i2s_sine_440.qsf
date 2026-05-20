@@ -1,0 +1,11 @@
+set_global_assignment -name FAMILY "Cyclone IV E"
+set_global_assignment -name DEVICE EP4CE6E22C8
+set_global_assignment -name TOP_LEVEL_ENTITY i2s_sine_440
+set_global_assignment -name VERILOG_FILE i2s_sine_440.v
+
+# Пін-призначення (підтверджено фізично)
+set_location_assignment PIN_24   -to clk
+set_location_assignment PIN_110  -to mclk
+set_location_assignment PIN_111  -to lrclk
+set_location_assignment PIN_112  -to sclk
+set_location_assignment PIN_113  -to sdin
