@@ -15,6 +15,18 @@ simulation/
 *.jic
 *.pin
 *.sld
+*.jdi
+*.cdf
+*.qarlog
+*.tis_db_list.ddb
+*.map
+
+# KiCad lock files
+~*.lck
+
+# Quartus editor backups
+*.v.bak
+*.vhd.bak
 
 # Simulation / compile artifacts
 *.vvp
@@ -23,7 +35,9 @@ simulation/
 
 # macOS
 .DS_Store
+**/.DS_Store
 
-# HTML scratch files
-scratch_*.html
-ep4ce6e22_pinout*.html
+# Editor
+.vscode/
+*.swp
+*~
