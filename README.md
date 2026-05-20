@@ -1,6 +1,7 @@
 # fpga-synth
 
-Modular audio synthesizer on **Cyclone IV FPGA** (EP4CE6E22C8N).  
+The idea: attach a piezo to a spring to get a real analog spring reverb as a sound source. Run audio from a phone or MP3 through it, apply effects — bitcrusher, wet/dry mix, decay — controlled by potentiometers in real time. Buttons for switching effect presets are planned.
+
 All DSP written in Verilog from scratch — no IP cores, no libraries.
 
 > Personal learning project. Blog (Ukrainian): [vasyl-pryimak.github.io](https://vasyl-pryimak.github.io/blog/)
