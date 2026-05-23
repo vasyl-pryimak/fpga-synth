@@ -1,27 +1,9 @@
-// spring_reverb.v — Phase 5: Spring Reverb з 4 потенціометрами
+// spring_reverb.v — Phase 5: Spring Reverb з 4 потенціометрами (A3 Disabled)
 //
 // Ланцюжок сигналу:
 //   PCM1808 → left_cap
-//     → pre_delay_line (A3)     ← затримка перед реverbом (0..43ms)
-//     → reverb_core             ← 3 Schroeder comb + decay (A2) + wet/dry (A1)
-//     → × volume (A0)
-//     → CS4344
-//
-// Потенціометри:
-//   A0 → гучність
-//   A1 → wet/dry (0=сухий, max=реверб)
-//   A2 → decay / feedback (0=короткий хвіст, max=довгий хвіст, cap 0.75)
-//   A3 → pre-delay (0=без затримки, max≈43ms)
-//
-// Піни:
-//   PIN_24   → clk   50 MHz
-//   PIN_110  → mclk  CS4344 MCLK  + PCM1808 SCKI
-//   PIN_111  → lrclk CS4344 LRCLK + PCM1808 LRCK
-//   PIN_112  → sclk  CS4344 SCLK  + PCM1808 BCK
-//   PIN_113  → sdin  CS4344 SDIN
-//   PIN_115  ← dout  PCM1808 DOUT
-//   PIN_119  ↔ sda   ADS1115 SDA (I²C)
-//   PIN_120  → scl   ADS1115 SCL  (I²C)
+//     → reverb_core (audio_in, audio_dry)   ← A3 Disabled
+//   reverb_core → × volume (A0) → CS4344
 
 module spring_reverb (
     input  wire clk,
@@ -34,7 +16,7 @@ module spring_reverb (
     output wire scl
 );
 
-// ── MCLK: 50 MHz / 4 = 12.5 MHz ──────────────────────────────────
+// ── MCLK / SCLK / LRCLK ──────────────────────────────────────────
 reg mclk_r = 0, m_cnt = 0;
 always @(posedge clk) begin
     m_cnt  <= m_cnt + 1;
@@ -42,7 +24,6 @@ always @(posedge clk) begin
 end
 assign mclk = mclk_r;
 
-// ── SCLK: 50 MHz / 16 = 3.125 MHz ────────────────────────────────
 reg       sclk_r = 0;
 reg [2:0] s_cnt  = 0;
 always @(posedge clk) begin
@@ -51,19 +32,16 @@ always @(posedge clk) begin
 end
 assign sclk = sclk_r;
 
-// ── Детектори фронтів SCLK ────────────────────────────────────────
 reg sclk_d = 0;
 always @(posedge clk) sclk_d <= sclk_r;
 wire sclk_fall = sclk_d & ~sclk_r;
 wire sclk_rise = ~sclk_d & sclk_r;
 
-// ── Лічильник бітів 0..63 ─────────────────────────────────────────
 reg [5:0] bit_cnt = 0;
 always @(posedge clk)
     if (sclk_fall)
         bit_cnt <= (bit_cnt == 6'd63) ? 6'd0 : bit_cnt + 1;
 
-// ── LRCLK ─────────────────────────────────────────────────────────
 reg lrclk_r = 0;
 always @(posedge clk)
     if (sclk_fall) begin
@@ -72,10 +50,9 @@ always @(posedge clk)
     end
 assign lrclk = lrclk_r;
 
-// ── I²S приймач: PCM1808 DOUT → rx_buf → left_cap / right_cap ─────
+// ── I²S приймач ───────────────────────────────────────────────────
 reg [23:0] rx_buf    = 0;
 reg signed [15:0] left_cap  = 0;
-reg signed [15:0] right_cap = 0;
 
 always @(posedge clk)
     if (sclk_rise)
@@ -84,17 +61,15 @@ always @(posedge clk)
 always @(posedge clk)
     if (sclk_fall) begin
         if (bit_cnt == 6'd24) left_cap  <= rx_buf[23:8];
-        if (bit_cnt == 6'd56) right_cap <= rx_buf[23:8];
     end
 
-// ── sample_rdy: 1-cycle pulse після захоплення обох каналів ───────
 wire sample_rdy = sclk_fall && (bit_cnt == 6'd57);
 
 // ── I²C master: читає A0..A3 ──────────────────────────────────────
 wire [15:0] volume_raw;
 wire [15:0] wet_raw;
 wire [15:0] decay_raw;
-wire [15:0] predelay_raw;
+wire [15:0] predelay_raw; // Залишаємо дріт, але не використовуємо
 
 i2c_master u_i2c (
     .clk          (clk),
@@ -108,26 +83,16 @@ i2c_master u_i2c (
 
 // ── Масштабування значень потенціометрів ──────────────────────────
 wire [15:0] vol      = {1'b0, volume_raw[14:0]};
-wire [15:0] wet_gain = {1'b0, wet_raw[14:0]};  // A1: скільки ревербу додати
-wire [15:0] dry_gain = 16'h7FFF;               // dry завжди 100%
+wire [15:0] wet_gain = {1'b0, wet_raw[14:0]};
+wire [15:0] dry_gain = 16'h7FFF - wet_gain;
 
-// Decay = feedback per comb filter: 0 → 0.75 max
-// Кап 0x6000 = 24576 = 0.75 — вище починається "репіння"
-wire [15:0] decay_uncapped = decay_raw + {3'b000, decay_raw[14:3]};  // × 1.125
-wire [15:0] decay_gain     = (decay_uncapped > 16'h6000) ? 16'h6000 : decay_uncapped;
+// Decay 0..0.85
+wire [31:0] decay_scaled = (decay_raw[14:0] * 16'd27852) >> 15;
+wire [15:0] decay_gain   = {1'b0, decay_scaled[14:0]};
 
-// Pre-delay: 0..43ms @ 48kHz
-// DEPTH=2048 → 4 M9K (замість 8 для DEPTH=4096)
-// predelay_raw 0..26400 → delay_samples 0..2047 (bits [13:3] = >> 3, кламп до 11 біт)
-// Мінімум 40 семплів або 0 (bypass) — щоб уникнути comb filter рінгу
-wire [10:0] predelay_raw_s = predelay_raw[13:3];
-wire [10:0] predelay_samples = (predelay_raw_s < 11'd40) ? 11'd0 : predelay_raw_s;
-
-// ── Pre-delay line (A3) ───────────────────────────────────────────
-// При predelay_samples=0: bypass (left_cap напряму), бо delay_line
-// з samples=0 читає з-під wr_ptr і дає 2048 семплів затримки замість 0
-wire signed [15:0] predelay_out;
-
+// A3 (Pre-delay) - Disabled as requested
+// wire [10:0] predelay_samples = predelay_raw[13:3];
+/*
 delay_line #(.DEPTH(2048), .ADDR_BITS(11)) u_predelay (
     .clk          (clk),
     .we           (sample_rdy),
@@ -135,8 +100,7 @@ delay_line #(.DEPTH(2048), .ADDR_BITS(11)) u_predelay (
     .delay_samples(predelay_samples),
     .audio_out    (predelay_out)
 );
-
-wire signed [15:0] predelayed = (|predelay_samples) ? predelay_out : left_cap;
+*/
 
 // ── Spring Reverb Core ────────────────────────────────────────────
 wire signed [15:0] reverb_out;
@@ -144,25 +108,24 @@ wire signed [15:0] reverb_out;
 reverb_core u_reverb (
     .clk        (clk),
     .we         (sample_rdy),
-    .audio_in   (predelayed),   // ← через pre-delay
+    .audio_in   (left_cap),   // Direct to wet path (A3 bypassed)
+    .audio_dry  (left_cap),   // Instant dry path
     .wet_gain   (wet_gain),
     .dry_gain   (dry_gain),
     .decay_gain (decay_gain),
     .audio_out  (reverb_out)
 );
 
-// ── Гучність (A0) × reverb_out → вихід ───────────────────────────
+// ── Гучність (A0) ─────────────────────────────────────────────────
 wire signed [31:0] left_vol  = $signed(reverb_out) * $signed(vol);
-wire signed [31:0] right_vol = $signed(reverb_out) * $signed(vol);
 wire signed [15:0] left_out  = left_vol[30:15];
-wire signed [15:0] right_out = right_vol[30:15];
 
-// ── I²S передавач: → shift_reg → CS4344 SDIN ─────────────────────
+// ── I²S передавач ─────────────────────────────────────────────────
 reg [31:0] shift_reg = 0;
 always @(posedge clk)
     if (sclk_fall) begin
         if      (bit_cnt == 6'd0)  shift_reg <= {left_out,  16'h0000};
-        else if (bit_cnt == 6'd32) shift_reg <= {right_out, 16'h0000};
+        else if (bit_cnt == 6'd32) shift_reg <= {left_out,  16'h0000};
         else                       shift_reg <= {shift_reg[30:0], 1'b0};
     end
 assign sdin = shift_reg[31];

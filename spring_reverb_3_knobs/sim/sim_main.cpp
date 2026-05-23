@@ -1,7 +1,8 @@
 // sim_main.cpp — Verilator testbench for reverb_core
 //
 // Full signal chain (mirrors spring_reverb.v):
-//   audio_in → pre-delay (A3) → reverb_core (A1 wet, A2 decay) → × volume (A0) → out
+//   audio_in → reverb_core (audio_in, audio_dry)
+//   reverb_core → × volume (A0) → out
 //
 // Usage:
 //   ./reverb-sim input.wav output.wav [options]
@@ -9,8 +10,7 @@
 // Options (fixed or start:end sweep):
 //   --volume=0.8        A0: volume (0=silence, 1=full)
 //   --wet=0.8           A1: wet/dry (0=dry, 1=full reverb)
-//   --decay=0.6         A2: reverb tail (0=no tail, 1=max ~0.75 capped)
-//   --predelay=0.3      A3: pre-delay (0=off, 1=max ~43ms)
+//   --decay=0.6         A2: reverb tail (0=no tail, 1=max ~0.85 extreme)
 //   --sweep-dur=10      sweep duration in seconds (default: full song)
 //   --auto=curve.csv    CSV automation
 
@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <vector>
 #include <cmath>
+#include <string>
 
 // ── WAV I/O ────────────────────────────────────────────────────────────────
 
@@ -162,24 +163,7 @@ void tick(Vreverb_core* top) {
     top->clk=1; top->eval(); sim_time++;
 }
 
-// ── Pre-delay (mirrors delay_line.v, C++ version) ─────────────────────────
-static const int PREDELAY_DEPTH = 2048;
-static int16_t predelay_mem[PREDELAY_DEPTH] = {};
-static int     predelay_wr = 0;
-
-int16_t predelay_process(int16_t sample_in, int delay_samples) {
-    // delay_samples < 40 → bypass (mirrors spring_reverb.v)
-    if (delay_samples < 40) {
-        predelay_mem[predelay_wr] = sample_in;
-        predelay_wr = (predelay_wr + 1) % PREDELAY_DEPTH;
-        return sample_in;
-    }
-    int rd = (predelay_wr - delay_samples + PREDELAY_DEPTH * 2) % PREDELAY_DEPTH;
-    int16_t out = predelay_mem[rd];
-    predelay_mem[predelay_wr] = sample_in;
-    predelay_wr = (predelay_wr + 1) % PREDELAY_DEPTH;
-    return out;
-}
+// ── Pre-delay (Bypassed in main loop) ─────────────────────────────────────
 
 // ── Main ───────────────────────────────────────────────────────────────────
 
@@ -190,16 +174,15 @@ int main(int argc, char** argv) {
     Param vol_p      = {1.0f, 1.0f};
     Param wet_p      = {0.8f, 0.8f};
     Param decay_p    = {0.6f, 0.6f};
-    Param predelay_p = {0.0f, 0.0f};
+    Param predelay_p = {0.0f, 0.0f}; // Ignored for now
     float sweep_dur  = -1.f;
 
     for (int i=1; i<argc; i++) {
         if      (strncmp(argv[i],"--volume=",9)==0)    vol_p      = parse_param(argv[i]+9);
         else if (strncmp(argv[i],"--wet=",6)==0)       wet_p      = parse_param(argv[i]+6);
         else if (strncmp(argv[i],"--decay=",8)==0)     decay_p    = parse_param(argv[i]+8);
-        else if (strncmp(argv[i],"--predelay=",11)==0) predelay_p = parse_param(argv[i]+11);
-        else if (strncmp(argv[i],"--auto=",7)==0)      auto_path  = argv[i]+7;
         else if (strncmp(argv[i],"--sweep-dur=",12)==0) sweep_dur  = atof(argv[i]+12);
+        else if (strncmp(argv[i],"--auto=",7)==0)      auto_path  = argv[i]+7;
         else if (!in_path)  in_path  = argv[i];
         else if (!out_path) out_path = argv[i];
     }
@@ -209,8 +192,7 @@ int main(int argc, char** argv) {
             "Usage: reverb-sim input.wav output.wav [options]\n"
             "  --volume=1.0       A0: volume\n"
             "  --wet=0.8          A1: wet/dry\n"
-            "  --decay=0.6        A2: reverb tail\n"
-            "  --predelay=0.0     A3: pre-delay (0..1 = 0..43ms)\n"
+            "  --decay=0.6        A2: reverb tail (0..1 -> 0..0.85)\n"
             "  --sweep-dur=10     sweep duration in seconds\n"
             "  --auto=curve.csv   CSV: time,volume,wet,decay,predelay\n");
         return 1;
@@ -226,7 +208,7 @@ int main(int argc, char** argv) {
     VerilatedContext* ctx = new VerilatedContext;
     ctx->commandArgs(argc, argv);
     Vreverb_core* top = new Vreverb_core(ctx);
-    top->we=0; top->audio_in=0; top->wet_gain=top->dry_gain=top->decay_gain=0;
+    top->we=0; top->audio_in=top->audio_dry=0; top->wet_gain=top->dry_gain=top->decay_gain=0;
     for (int i=0; i<8; i++) tick(top);
 
     std::vector<int16_t> out;
@@ -239,39 +221,29 @@ int main(int argc, char** argv) {
         float t_sec = (float)i / (float)rate;
         float t_pos = t_sec / dur; if (t_pos > 1.f) t_pos = 1.f;
 
-        float vol, wet, decay, predelay;
+        float vol, wet, decay, predelay_dummy;
         if (!auto_pts.empty()) {
-            auto_at(auto_pts, t_sec, vol, wet, decay, predelay);
+            auto_at(auto_pts, t_sec, vol, wet, decay, predelay_dummy);
         } else {
             vol      = vol_p.at(t_pos);
             wet      = wet_p.at(t_pos);
             decay    = decay_p.at(t_pos);
-            predelay = predelay_p.at(t_pos);
         }
 
-        // A3: pre-delay (mirrors spring_reverb.v predelay_samples calc)
-        // predelay 0..1 → predelay_raw 0..32767 → [13:3] = >>3 → 0..2047
-        uint16_t predelay_raw = to_q15(predelay);
-        int delay_samples = (predelay_raw >> 3) & 0x7FF;  // bits [13:3] → 11-bit
-
-        int16_t pd_out = predelay_process(samples[i], delay_samples);
-
-        // A1/A2: reverb_core
+        // A1/A2: reverb_core settings
         if (wet != prev_wet || decay != prev_decay) {
-            // A2 decay: mirrors spring_reverb.v decay_gain formula
-            uint16_t decay_raw     = to_q15(decay);
-            uint32_t decay_uncap   = decay_raw + (decay_raw >> 3);  // ×1.125
-            uint16_t decay_gain    = (decay_uncap > 0x6000) ? 0x6000 : (uint16_t)decay_uncap;
+            // A2 decay: hardware formula (0..0.85 limit)
+            uint16_t decay_raw = to_q15(decay);
+            uint32_t decay_scaled = ((uint32_t)decay_raw * 27852) >> 15;
+            top->decay_gain = (uint16_t)decay_scaled;
+
             top->wet_gain   = to_q15(wet);
-            // Crossfade: dry = 1 - wet so total mix ≤ 100% and no overflow.
-            // Hardware has dry_gain = 0x7FFF always (fine because LINE IN is ~-12dBFS);
-            // simulation uses mastered WAV at ~0dBFS, so additive dry+wet clips hard.
-            top->dry_gain   = to_q15(1.0f - wet);
-            top->decay_gain = decay_gain;
+            top->dry_gain   = 0x7FFF - top->wet_gain;
             prev_wet = wet; prev_decay = decay;
         }
 
-        top->audio_in = pd_out;
+        top->audio_dry = samples[i]; // Direct path
+        top->audio_in  = samples[i]; // Wet path (No Pre-delay)
         top->we = 1; tick(top);
         int16_t reverb_out = top->audio_out;
         top->we = 0; tick(top);
@@ -288,7 +260,6 @@ int main(int argc, char** argv) {
         fprintf(stderr, "volume: %.2f%s\n", vol_p.start, vol_p.is_sweep() ? (" → "+std::to_string(vol_p.end)).c_str() : "");
         fprintf(stderr, "wet   : %.2f%s\n", wet_p.start, wet_p.is_sweep() ? (" → "+std::to_string(wet_p.end)).c_str() : "");
         fprintf(stderr, "decay : %.2f%s\n", decay_p.start, decay_p.is_sweep() ? (" → "+std::to_string(decay_p.end)).c_str() : "");
-        fprintf(stderr, "predly: %.2f%s\n", predelay_p.start, predelay_p.is_sweep() ? (" → "+std::to_string(predelay_p.end)).c_str() : "");
     }
 
     write_wav(out_path, out, rate);
