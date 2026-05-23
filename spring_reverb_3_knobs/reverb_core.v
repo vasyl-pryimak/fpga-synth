@@ -81,7 +81,12 @@ delay_line #(.DEPTH(4096), .ADDR_BITS(12)) dl3 (
 wire signed [17:0] wet_sum_18 = {{2{tap1_raw[15]}}, tap1_raw}
                               + {{2{tap2_raw[15]}}, tap2_raw}
                               + {{2{tap3_raw[15]}}, tap3_raw};
-wire signed [15:0] wet_sum = wet_sum_18[16:1];  // ÷2
+// Saturating ÷2: bits[16:1] wraps sign when sum > 65535 or < -65536.
+// Detect overflow by checking if bit17 and bit16 differ.
+wire signed [15:0] wet_sum =
+    (~wet_sum_18[17] &  wet_sum_18[16]) ? 16'sh7FFF :   // positive overflow → clamp
+    ( wet_sum_18[17] & ~wet_sum_18[16]) ? 16'sh8000 :   // negative overflow → clamp
+    wet_sum_18[16:1];
 
 // ── Wet/Dry мікс ─────────────────────────────────────────────────
 wire signed [31:0] wet_mul = $signed(wet_sum)  * $signed({1'b0, wet_gain[14:0]});

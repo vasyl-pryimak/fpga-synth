@@ -58,9 +58,48 @@ i2c_volume/                     — ADS1115 → volume control
 i2c_volume/arduino_as_i2c.ino  — Arduino sketch: I2C slave, reads potentiometer
 spring_reverb/                  — Spring reverb prototype
 spring_reverb_3_knobs/          — Main project: reverb + bitcrusher + 4 knobs
+spring_reverb_3_knobs/sim/      — Verilator simulator (see below)
 docs/                           — KiCad schematic, SVG diagrams
 docs/EP4CE6E22C8N/              — Board datasheets and pin reference
 ```
+
+## Verilator simulator (`spring_reverb_3_knobs/sim/`)
+
+Lets you tweak reverb parameters and hear the result without flashing the FPGA.
+Compiles `reverb_core.v` + `delay_line.v` into a native binary via [Verilator](https://verilator.org),
+then runs a WAV file through it.
+
+**Requires:** `verilator`, `python3`, `ffmpeg` (for MP3 → WAV conversion)
+
+```bash
+# Install verilator (macOS)
+brew install verilator
+
+# Convert your audio to the right format
+ffmpeg -i song.mp3 -ar 48000 -ac 1 -sample_fmt s16 input.wav
+
+# Build the simulator
+cd spring_reverb_3_knobs/sim && make
+
+# Run CLI
+../reverb-sim input.wav output.wav --wet=0.8 --decay=0.6 --volume=1.0 --predelay=0.0
+
+# Or launch the browser UI (4 knobs + oscilloscope + live re-render)
+python3 sim/server.py
+# → open http://localhost:8765
+```
+
+**CLI options:**
+
+| Option | Knob | Description |
+|--------|------|-------------|
+| `--volume=0.8` | A0 | Output volume |
+| `--wet=0.8` | A1 | Wet/dry mix |
+| `--decay=0.6` | A2 | Reverb tail length |
+| `--predelay=0.0` | A3 | Pre-delay before reverb (0 = off, 1 = ~43ms) |
+| `--wet=0.0:1.0` | — | Sweep from start to end value over the song |
+| `--sweep-dur=10` | — | Sweep duration in seconds (default: full song) |
+| `--auto=curve.csv` | — | CSV automation: `time,volume,wet,decay,predelay` |
 
 ## Potentiometers (spring_reverb_3_knobs)
 

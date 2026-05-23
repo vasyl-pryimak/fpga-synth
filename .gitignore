@@ -33,6 +33,15 @@ simulation/
 *.vcd
 *.lxt
 
+# Verilator build artifacts
+**/sim/obj_dir/
+**/reverb-sim
+**/sim/sim
+
+# Audio files (large, not source)
+*.wav
+*.mp3
+
 # macOS
 .DS_Store
 **/.DS_Store
