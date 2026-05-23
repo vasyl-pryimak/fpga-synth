@@ -45,16 +45,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             volume   = max(0.0, min(1.0, float(body.get("volume",   1.0))))
             wet      = max(0.0, min(1.0, float(body.get("wet",      0.8))))
             decay    = max(0.0, min(1.0, float(body.get("decay",    0.6))))
-            predelay = max(0.0, min(1.0, float(body.get("predelay", 0.0))))
+            pitch    = max(0.0, min(1.0, float(body.get("pitch",    0.5))))
 
-            print(f"  render  vol={volume:.2f}  wet={wet:.2f}  decay={decay:.2f}  predelay={predelay:.2f} ...", flush=True)
+            print(f"  render  vol={volume:.2f}  wet={wet:.2f}  decay={decay:.2f}  pitch={pitch:.2f} ...", flush=True)
             t0 = __import__('time').time()
 
             with render_lock:
+                # Updated to pass --pitch instead of --predelay
                 result = subprocess.run(
                     [str(SIM_BIN), str(INPUT_WAV), str(OUTPUT_WAV),
                      f"--volume={volume:.4f}", f"--wet={wet:.4f}",
-                     f"--decay={decay:.4f}", f"--predelay={predelay:.4f}"],
+                     f"--decay={decay:.4f}", f"--pitch={pitch:.4f}"],
                     capture_output=True, text=True
                 )
 

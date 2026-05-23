@@ -267,16 +267,16 @@ h1 {
     <div class="knob-value" id="kv-decay">0.60</div>
   </div>
 
-  <div class="knob-wrap" id="k-predelay" data-value="0.0">
+  <div class="knob-wrap" id="k-pitch" data-value="0.5">
     <div class="knob-ring">
       <svg class="knob-svg" viewBox="0 0 96 96">
-        <path class="arc-track" id="predelay-track"/>
-        <path class="arc-fill"  id="predelay-fill"/>
+        <path class="arc-track" id="pitch-track"/>
+        <path class="arc-fill"  id="pitch-fill"/>
       </svg>
-      <div class="knob-body" id="kb-predelay"><div class="knob-dot"></div></div>
+      <div class="knob-body" id="kb-pitch"><div class="knob-dot"></div></div>
     </div>
-    <div class="knob-label">Pre-delay</div>
-    <div class="knob-value" id="kv-predelay">0.00</div>
+    <div class="knob-label">Pitch</div>
+    <div class="knob-value" id="kv-pitch">1.00</div>
   </div>
 
 </div>
@@ -290,7 +290,6 @@ h1 {
 <script>
 // ── Arc geometry ───────────────────────────────────────────────────────────
 const CX = 48, CY = 48, R = 42;
-// Range: 135° (bottom-left) → 45° (bottom-right), clockwise = 270° sweep
 const A0 = 135 * Math.PI / 180;
 const A1 = (135 + 270) * Math.PI / 180;
 
@@ -319,11 +318,17 @@ function drawKnob(id, val) {
   const deg = val * 270 - 135;
   body.style.transform = `rotate(${deg}deg)`;
 
-  document.getElementById(`kv-${id}`).textContent = val.toFixed(2);
+  if (id === 'pitch') {
+    // Pitch value mapping for display: 0.95 to 1.05
+    const ratio = 0.95 + val * 0.10;
+    document.getElementById(`kv-${id}`).textContent = ratio.toFixed(2) + 'x';
+  } else {
+    document.getElementById(`kv-${id}`).textContent = val.toFixed(2);
+  }
 }
 
 // Init visuals
-['volume','wet','decay','predelay'].forEach(id => {
+['volume','wet','decay','pitch'].forEach(id => {
   const wrap = document.getElementById(`k-${id}`);
   drawKnob(id, parseFloat(wrap.dataset.value));
 });
@@ -331,7 +336,7 @@ function drawKnob(id, val) {
 // ── Knob drag ──────────────────────────────────────────────────────────────
 let drag = null, dragY0 = 0, dragV0 = 0;
 
-['volume','wet','decay','predelay'].forEach(id => {
+['volume','wet','decay','pitch'].forEach(id => {
   const body = document.getElementById(`kb-${id}`);
   body.addEventListener('mousedown', e => {
     const wrap = document.getElementById(`k-${id}`);
@@ -420,7 +425,7 @@ async function doRender() {
   const volume   = parseFloat(document.getElementById('k-volume').dataset.value);
   const wet      = parseFloat(document.getElementById('k-wet').dataset.value);
   const decay    = parseFloat(document.getElementById('k-decay').dataset.value);
-  const predelay = parseFloat(document.getElementById('k-predelay').dataset.value);
+  const pitch    = parseFloat(document.getElementById('k-pitch').dataset.value);
 
   status.className = 'status rendering';
   status.textContent = 'rendering...';
@@ -435,7 +440,7 @@ async function doRender() {
     const res = await fetch('/render', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ volume, wet, decay, predelay })
+      body: JSON.stringify({ volume, wet, decay, pitch })
     });
     const json = await res.json();
     const ms   = Date.now() - t0;
@@ -472,7 +477,6 @@ async function doRender() {
   rendering = false;
 }
 
-// Initial render on load
 doRender();
 
 // ── Oscilloscope ───────────────────────────────────────────────────────────
@@ -502,39 +506,31 @@ function resizeScope() {
 
 function drawScope() {
   rafId = requestAnimationFrame(drawScope);
-
   const W = canvas.width, H = canvas.height;
   ctx2d.clearRect(0, 0, W, H);
-
-  // background grid lines
   ctx2d.strokeStyle = '#1c1c1c';
   ctx2d.lineWidth = 1;
   ctx2d.beginPath();
-  ctx2d.moveTo(0, H / 2); ctx2d.lineTo(W, H / 2);  // centre
-  ctx2d.moveTo(0, H / 4); ctx2d.lineTo(W, H / 4);  // top quarter
-  ctx2d.moveTo(0, H * 3/4); ctx2d.lineTo(W, H * 3/4); // bottom quarter
+  ctx2d.moveTo(0, H / 2); ctx2d.lineTo(W, H / 2);
+  ctx2d.moveTo(0, H / 4); ctx2d.lineTo(W, H / 4);
+  ctx2d.moveTo(0, H * 3/4); ctx2d.lineTo(W, H * 3/4);
   ctx2d.stroke();
-
   if (!analyser) return;
-
   if (!audio.paused) analyser.getByteTimeDomainData(scopeBuf);
-
   ctx2d.strokeStyle = '#e8622a';
   ctx2d.lineWidth   = 1.5 * devicePixelRatio;
   ctx2d.shadowColor = 'rgba(232,98,42,0.4)';
   ctx2d.shadowBlur  = 4 * devicePixelRatio;
   ctx2d.beginPath();
-
   const step = W / scopeBuf.length;
   for (let i = 0; i < scopeBuf.length; i++) {
-    const y = (1 - scopeBuf[i] / 128) * (H / 2) + H / 2;  // 128=silence → centre
+    const y = (1 - scopeBuf[i] / 128) * (H / 2) + H / 2;
     i === 0 ? ctx2d.moveTo(0, y) : ctx2d.lineTo(i * step, y);
   }
   ctx2d.stroke();
   ctx2d.shadowBlur = 0;
 }
 
-// start AudioContext on first play (browser autoplay policy)
 playBtn.addEventListener('click', () => {
   initAudioCtx();
   if (audioCtx.state === 'suspended') audioCtx.resume();

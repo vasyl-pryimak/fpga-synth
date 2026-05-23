@@ -1,8 +1,10 @@
-// spring_reverb.v — Phase 5: Spring Reverb з 4 потенціометрами (A3 Disabled)
+// spring_reverb.v — Phase 6: Reverb + Pitch Shifter (A3)
 //
 // Ланцюжок сигналу:
 //   PCM1808 → left_cap
-//     → reverb_core (audio_in, audio_dry)   ← A3 Disabled
+//     → pitch_shifter (A3)      ← НОВИЙ ЕФЕКТ (Pitch Up/Down)
+//     ├→ reverb_core (audio_in) ← затриманий (wet) шлях
+//     └→ reverb_core (audio_dry)← прямий сигнал миттєво
 //   reverb_core → × volume (A0) → CS4344
 
 module spring_reverb (
@@ -69,7 +71,7 @@ wire sample_rdy = sclk_fall && (bit_cnt == 6'd57);
 wire [15:0] volume_raw;
 wire [15:0] wet_raw;
 wire [15:0] decay_raw;
-wire [15:0] predelay_raw; // Залишаємо дріт, але не використовуємо
+wire [15:0] predelay_raw; // Тепер це Pitch Ratio
 
 i2c_master u_i2c (
     .clk          (clk),
@@ -90,17 +92,22 @@ wire [15:0] dry_gain = 16'h7FFF - wet_gain;
 wire [31:0] decay_scaled = (decay_raw[14:0] * 16'd27852) >> 15;
 wire [15:0] decay_gain   = {1'b0, decay_scaled[14:0]};
 
-// A3 (Pre-delay) - Disabled as requested
-// wire [10:0] predelay_samples = predelay_raw[13:3];
-/*
-delay_line #(.DEPTH(2048), .ADDR_BITS(11)) u_predelay (
-    .clk          (clk),
-    .we           (sample_rdy),
-    .audio_in     (left_cap),
-    .delay_samples(predelay_samples),
-    .audio_out    (predelay_out)
+// A3: Pitch Ratio mapping (Narrow range: 0.95 to 1.05)
+// 0.95 * 16384 = 15565 (0x3CCD)
+// 1.05 * 16384 = 17203 (0x4333)
+// Span = 17203 - 15565 = 1638
+wire [31:0] ratio_32 = ((predelay_raw[14:0] * 16'd1638) >> 15) + 16'd15565;
+wire [15:0] pitch_ratio = ratio_32[15:0];
+
+// ── Pitch Shifter (A3) ────────────────────────────────────────────
+wire signed [15:0] pitched_out;
+pitch_shifter #(.DEPTH(2048), .ADDR_BITS(11)) u_pitch (
+    .clk      (clk),
+    .we       (sample_rdy),
+    .audio_in (left_cap),
+    .ratio    (pitch_ratio),
+    .audio_out(pitched_out)
 );
-*/
 
 // ── Spring Reverb Core ────────────────────────────────────────────
 wire signed [15:0] reverb_out;
@@ -108,8 +115,8 @@ wire signed [15:0] reverb_out;
 reverb_core u_reverb (
     .clk        (clk),
     .we         (sample_rdy),
-    .audio_in   (left_cap),   // Direct to wet path (A3 bypassed)
-    .audio_dry  (left_cap),   // Instant dry path
+    .audio_in   (pitched_out),// Ефект Pitch Shifter йде в реверб
+    .audio_dry  (left_cap),   // Прямий сигнал залишається оригінальним
     .wet_gain   (wet_gain),
     .dry_gain   (dry_gain),
     .decay_gain (decay_gain),
@@ -125,7 +132,7 @@ reg [31:0] shift_reg = 0;
 always @(posedge clk)
     if (sclk_fall) begin
         if      (bit_cnt == 6'd0)  shift_reg <= {left_out,  16'h0000};
-        else if (bit_cnt == 6'd32) shift_reg <= {left_out,  16'h0000};
+        else if (bit_cnt == 6'd32) shift_reg <= {left_out,  16'h0000}; 
         else                       shift_reg <= {shift_reg[30:0], 1'b0};
     end
 assign sdin = shift_reg[31];
